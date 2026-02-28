@@ -1,0 +1,71 @@
+mod config;
+mod db;
+mod handlers;
+mod models;
+mod utils;
+
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use tower_cookies::CookieManagerLayer;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::{
+    config::Config,
+    db::create_pool,
+    handlers::auth::{login, logout, profile, refresh, register, AppState},
+    models::{refresh_token::RefreshTokenRepository, user::UserRepository},
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Initialize tracing (logging)
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    // Load config
+    let config = Config::from_env()?;
+
+    // Database pool
+    let pool = create_pool(&config).await?;
+
+    // Run migrations
+    sqlx::migrate!("./migrations").run(&pool).await?;
+
+    // Repositories
+    let user_repo = UserRepository::new(pool.clone());
+    let refresh_token_repo = RefreshTokenRepository::new(pool);
+
+    // App state
+    let state = AppState {
+        user_repo,
+        refresh_token_repo,
+        config: config.clone(),
+    };
+
+    // Build router
+    let app = Router::new()
+        .route("/register", post(register))
+        .route("/login", post(login))
+        .route("/logout", post(logout))
+        .route("/refresh", post(refresh))
+        .route("/profile", get(profile))
+        .layer(CookieManagerLayer::new()) // for cookie handling
+        .layer(TraceLayer::new_for_http()) // request logging
+        .with_state(state);
+
+    let addr = format!("{}:{}", config.host, config.port);
+    tracing::info!("Server listening on {}", addr);
+
+    axum::Server::bind(&addr.parse()?)
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
+}

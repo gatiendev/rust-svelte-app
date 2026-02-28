@@ -1,0 +1,21 @@
+# ---- Builder stage ----
+FROM rust:1.93 AS builder
+
+# Install cargo-watch
+RUN cargo install cargo-watch
+
+WORKDIR /app
+
+# Copy manifests first (for better caching)
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build || true
+
+# Copy the rest of the source (will be overridden by volume mount)
+COPY . .
+
+# Expose the port
+EXPOSE 8080
+
+# Start with cargo-watch
+CMD ["cargo", "watch", "-x", "run"]

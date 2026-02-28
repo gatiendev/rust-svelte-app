@@ -1,0 +1,58 @@
+# Rust (inside rust_api/)
+rust_api/target/
+rust_api/**/*.rs.bk
+rust_api/*.pdb
+
+# Svelte (inside frontend/)
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/coverage/
+frontend/coverage.*
+frontend/*.lcov
+frontend/.vercel_build_output/
+frontend/.netlify/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# General binaries and artifacts (if any are generated at root, otherwise optional)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.o
+*.a
+
+# Cargo.lock – uncomment if building an executable (keep commented for libraries)
+# rust_api/Cargo.lock
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Temporary files
+tmp/
+temp/

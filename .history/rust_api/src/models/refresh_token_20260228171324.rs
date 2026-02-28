@@ -1,0 +1,70 @@
+use chrono::{DateTime, Duration, Utc};
+use sqlx::{Error as SqlxError, PgPool};
+use uuid::Uuid;
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct RefreshToken {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub token_hash: String,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone)]
+pub struct RefreshTokenRepository {
+    pool: PgPool,
+}
+
+impl RefreshTokenRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Store a hashed refresh token
+    pub async fn create(
+        &self,
+        user_id: Uuid,
+        token_hash: &str,
+        expires_in: Duration,
+    ) -> Result<Uuid, SqlxError> {
+        let expires_at = Utc::now() + expires_in;
+        let row: (Uuid,) = sqlx::query_as(
+            "INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id",
+        )
+        .bind(user_id)
+        .bind(token_hash)
+        .bind(expires_at)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    /// Find a refresh token by its hash (for validation)
+    pub async fn find_by_hash(&self, token_hash: &str) -> Result<Option<RefreshToken>, SqlxError> {
+        sqlx::query_as::<_, RefreshToken>(
+            "SELECT * FROM refresh_tokens WHERE token_hash = $1 AND expires_at > NOW()",
+        )
+        .bind(token_hash)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Delete a refresh token (logout / rotation)
+    pub async fn delete(&self, token_hash: &str) -> Result<(), SqlxError> {
+        sqlx::query("DELETE FROM refresh_tokens WHERE token_hash = $1")
+            .bind(token_hash)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Delete all refresh tokens for a user (optional, for security)
+    pub async fn delete_all_for_user(&self, user_id: Uuid) -> Result<(), SqlxError> {
+        sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+}

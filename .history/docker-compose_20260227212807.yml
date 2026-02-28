@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # go_api:
+  #   build:
+  #     context: ./go_api
+  #     dockerfile: Dockerfile.dev  
+  #   ports:
+  #     - "8000:8000"
+  #   restart: unless-stopped
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_USER: auth_user
+  #     DB_PASSWORD: auth_pass
+  #     DB_NAME: auth_db
+  #     JWT_ACCESS_SECRET: your-access-secret-change-me
+  #     JWT_REFRESH_SECRET: your-refresh-secret-change-me
+  #     ACCESS_TOKEN_DURATION: 15m
+  #     REFRESH_TOKEN_DURATION: 168h
+  #     SERVER_PORT: 8000
+  #     GIN_MODE: release
+  
+    #   # - DATABASE_URL=postgres://user:pass@db:5432/mydb
+    #   # Optional: add health check
+    #   dns:
+    #     - 8.8.8.8 
+    #   # command: "ls -la /app/migrations/migrations"
+    #   volumes:
+    #     - ./go_api:/app               # Mount entire project
+    #     - go_mod_cache:/go/pkg/mod  
+    #   healthcheck:
+    #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+    #     interval: 30s
+    #     timeout: 5s
+    #     retries: 3
+    #     start_period: 5s
+    #   networks:
+    #     - app-network
+    # volumes:
+    #   - ./go_api/migrations:/app/migrations
+    # If you need a database, uncomment the following:
+    # depends_on:
+    #   - db
+    # networks:
+    #   - backend
+
+    rust_api:
+      build:
+  context: ./rust_api          # path to your Rust project
+  dockerfile: Dockerfile.dev
+    ports:
+  - "8080:8080"                 # map host port 8080 to container
+    restart: unless-stopped
+    environment:
+  # Database connection – using the same variables as go_api
+  DATABASE_URL: postgres://auth_user:auth_pass@postgres:5432/auth_db
+  # Session secret – generate a strong random string
+  SESSION_SECRET: 4d55c25b447abe6bfe2f4507bbaa1ac6427676d350ab72663d4224478c181887
+  HOST: 0.0.0.0
+  PORT: 8080
+  # Optional: if your app reads DB_* variables separately
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_USER: auth_user
+  DB_PASSWORD: auth_pass
+  DB_NAME: auth_db
+    dns:
+  - 8.8.8.8 
+    volumes:
+  - ./rust_api:/app          # Mount source code for hot-reload
+  - cargo_cache:/usr/local/cargo/registry  # Persist cargo registry
+    depends_on:
+  postgres:
+    condition: service_healthy   # wait for postgres to be ready
+      networks:
+  - app-network
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8080/health"]   # if you have a health endpoint
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 10s
+
+    frontend:
+      build:
+  context: ./frontend
+  # dockerfile: Dockerfile
+  dockerfile: Dockerfile.prod
+  args:
+    VITE_WS_URL: ws://go_api:8000/ws 
+      ports:
+  # - "5173:5173"              # Public facing
+  - "5173:80"              # Public facing
+    volumes:
+    # - ./frontend:/app          # Mount source code
+    - /app/node_modules         # Prevent overwriting node_modules
+    depends_on:
+  - go_api
+    networks:
+  - app-network
+    restart: unless-stopped
+
+      postgres:
+    image: postgres:18-alpine
+    container_name: auth_db
+    environment:
+  POSTGRES_USER: auth_user
+  POSTGRES_PASSWORD: auth_pass
+  POSTGRES_DB: auth_db
+    ports:
+  - "5432:5432"
+    volumes:
+  - pg_data:/var/lib/postgresql/data
+    networks:
+  - app-network
+    healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U auth_user -d postgres"]
+  interval: 5s
+  timeout: 5s
+  retries: 5
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pg_data:
+  go_mod_cache:
+  cargo_cache:
+
+# Uncomment if you need a PostgreSQL database
+#   db:
+#     image: postgres:15-alpine
+#     environment:
+#       POSTGRES_USER: user
+#       POSTGRES_PASSWORD: pass
+#       POSTGRES_DB: mydb
+#     volumes:
+#       - pgdata:/var/lib/postgresql/data
+#     ports:
+#       - "5432:5432"
+#     restart: unless-stopped
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+
+# volumes:
+#   pgdata:

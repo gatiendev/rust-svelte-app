@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- INLINE SCRIPT TO SET DARK MODE BEFORE PAINT -->
+    <script>
+        (function () {
+            try {
+                const stored = localStorage.getItem('theme');
+                // Default to 'dark' if no stored value or stored is invalid
+                const theme = stored === 'light' ? 'light' : 'dark';
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            } catch (e) {
+                // localStorage unavailable (e.g., private mode)
+                document.documentElement.classList.add('dark'); // fallback to dark
+            }
+        })();
+    </script>
+    %sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+</body>
+
+</html>
